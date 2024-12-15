@@ -33,7 +33,10 @@ enum class AddressingMode : int {
     DirectByte,
     DirectLong,
     DirectExtended,
-    DirectIndexed,
+    DirectIndexedX,
+    DirectIndexedY,
+    DirectIndexedShortX,
+    DirectIndexedShortY,
     Immediate,
     SP,
     A,
@@ -126,9 +129,11 @@ void initializeTables() {
     instrTable[0x94] = LD<AddressingMode::SP, AddressingMode::X, 1>;
     instrTable[0xA5] = BCP<AddressingMode::Immediate>;
     instrTable[0xAE] = LD<AddressingMode::X, AddressingMode::Immediate, 1>;
+    instrTable[0xBE] = LD<AddressingMode::X, AddressingMode::DirectByte, 1>;
     instrTable[0xBF] = LD<AddressingMode::DirectByte, AddressingMode::X, 1>;
     instrTable[0xCE] = LD<AddressingMode::X, AddressingMode::DirectLong, 1>;
-    instrTable[0xF6] = LD<AddressingMode::A, AddressingMode::DirectIndexed, 0>;
+    instrTable[0xEE] = LD<AddressingMode::X, AddressingMode::DirectIndexedShortX, 1>;
+    instrTable[0xF6] = LD<AddressingMode::A, AddressingMode::DirectIndexedX, 0>;
 
     for (auto &i : precodeTable) {
         i = UNIMPLEMENTED_PRECODE;
@@ -136,8 +141,11 @@ void initializeTables() {
 
     precodeTable[0x94] = LD<AddressingMode::SP, AddressingMode::Y, 1>;
     precodeTable[0xAE] = LD<AddressingMode::Y, AddressingMode::Immediate, 1>;
+    precodeTable[0xBE] = LD<AddressingMode::Y, AddressingMode::DirectByte, 1>;
     precodeTable[0xBF] = LD<AddressingMode::DirectByte, AddressingMode::Y, 1>;
     precodeTable[0xCE] = LD<AddressingMode::Y, AddressingMode::DirectLong, 1>;
+    precodeTable[0xEE] = LD<AddressingMode::Y, AddressingMode::DirectIndexedShortY, 1>;
+    precodeTable[0xF6] = LD<AddressingMode::A, AddressingMode::DirectIndexedY, 0>;
 }
 
 void initialize() {
@@ -178,8 +186,14 @@ u32 getEffectiveAddress() {
             return fetch<u16>();
         case AddressingMode::DirectExtended:
             return ((u32)fetch<u8>() << 16) | ((u32)fetch<u8>() << 8) | (u32)fetch<u8>();
-        case AddressingMode::DirectIndexed:
+        case AddressingMode::DirectIndexedX:
             return ctx.x;
+        case AddressingMode::DirectIndexedY:
+            return ctx.y;
+        case AddressingMode::DirectIndexedShortX:
+            return ctx.x + fetch<u8>();
+        case AddressingMode::DirectIndexedShortY:
+            return ctx.y + fetch<u8>();
         default:
             assert(false);
     }
