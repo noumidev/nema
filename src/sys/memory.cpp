@@ -53,6 +53,7 @@ struct PageTable {
 } pageTable;
 
 struct Context {
+    u8 ram[MemorySize::RAM];
     u8 flash[MemorySize::FLASH];
     u8 eeprom[MemorySize::EEPROM];
 } ctx;
@@ -66,6 +67,7 @@ void initialize(const Config &config) {
     load(config.flashPath, ctx.flash, 0);
     load(config.eepromPath, ctx.eeprom, MemorySize::EEPROM);
 
+    pageTable.map(MemoryBase::RAM, MemorySize::RAM, ctx.ram, true, true);
     pageTable.map(MemoryBase::FLASH, MemorySize::FLASH, ctx.flash, true, false);
     pageTable.map(MemoryBase::EEPROM, MemorySize::EEPROM, ctx.eeprom, true, false);
 }

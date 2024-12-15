@@ -13,6 +13,7 @@ namespace sys::memory {
 
 namespace MemoryBase {
     enum : common::u32 {
+        RAM = 0,
         EEPROM = 0x1000,
         FLASH = 0x8000,
     };
@@ -20,6 +21,7 @@ namespace MemoryBase {
 
 namespace MemorySize {
     enum : common::u32 {
+        RAM = 0x1000, // ??
         EEPROM = 0x1000,
         FLASH = 0x8000,
         AddressSpace = 0x1000000,
