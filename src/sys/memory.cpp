@@ -88,7 +88,7 @@ T read(const u32 addr) {
         return bswap<T>(data);
     }
 
-    std::printf("Unmapped read%lu (address = %08X)\n", 8 * sizeof(T), addr);
+    std::printf("[  MEM  ] Unmapped read%lu (address = %08X)\n", 8 * sizeof(T), addr);
 
     return 0;
 }
@@ -112,7 +112,7 @@ void write(const u32 addr, const T data) {
         return;
     }
 
-    std::printf("Unmapped write%lu (address = %08X, data = %02X)\n", 8 * sizeof(T), addr, data);
+    std::printf("[  MEM  ] Unmapped write%lu (address = %08X, data = %02X)\n", 8 * sizeof(T), addr, data);
 }
 
 template void write(const u32 addr, const u8 data);
