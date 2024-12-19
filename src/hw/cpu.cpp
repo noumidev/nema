@@ -58,6 +58,7 @@ enum class Condition {
     NotEqual,
     Carry,
     NotCarry,
+    LowerSame,
 };
 
 struct Context {
@@ -147,6 +148,8 @@ template<Condition cc>
 void JRcc(const u8);
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void LD(const u8);
+template<AddressingMode mode>
+void MUL(const u8);
 void NOP(const u8);
 template<AddressingMode mode>
 void OR(const u8);
@@ -165,6 +168,8 @@ void RRC(const u8);
 template<AddressingMode mode>
 void RRWA(const u8);
 void SIM(const u8);
+template<AddressingMode mode, bool word>
+void SLL(const u8);
 template<AddressingMode mode, bool word>
 void SRL(const u8);
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
@@ -203,6 +208,7 @@ void initializeTables() {
     instrTable[0x1E] = LD<AddressingMode::X, AddressingMode::DirectIndexedShortSP, 1>;
     instrTable[0x1F] = LD<AddressingMode::DirectIndexedShortSP, AddressingMode::X, 1>;
     instrTable[0x20] = JRcc<Condition::True>;
+    instrTable[0x23] = JRcc<Condition::LowerSame>;
     instrTable[0x24] = JRcc<Condition::NotCarry>;
     instrTable[0x25] = JRcc<Condition::Carry>;
     instrTable[0x26] = JRcc<Condition::NotEqual>;
@@ -210,8 +216,10 @@ void initializeTables() {
     instrTable[0x35] = LD<AddressingMode::DirectLong, AddressingMode::Immediate, 0>;
     instrTable[0x3A] = DEC<AddressingMode::DirectByte, 0>;
     instrTable[0x3B] = PUSH<AddressingMode::Immediate, 1>;
+    instrTable[0x42] = MUL<AddressingMode::X>;
     instrTable[0x43] = CPL<AddressingMode::A, 0>;
     instrTable[0x44] = SRL<AddressingMode::A, 0>;
+    instrTable[0x48] = SLL<AddressingMode::A, 0>;
     instrTable[0x4A] = DEC<AddressingMode::A, 0>;
     instrTable[0x4B] = PUSH<AddressingMode::Immediate, 0>;
     instrTable[0x4D] = TNZ<AddressingMode::A, 0>;
@@ -254,6 +262,7 @@ void initializeTables() {
     instrTable[0xB3] = CP<AddressingMode::X, AddressingMode::DirectByte, 1>;
     instrTable[0xB6] = LD<AddressingMode::A, AddressingMode::DirectByte, 0>;
     instrTable[0xB7] = LD<AddressingMode::DirectByte, AddressingMode::A, 0>;
+    instrTable[0xBA] = OR<AddressingMode::DirectByte>;
     instrTable[0xBE] = LD<AddressingMode::X, AddressingMode::DirectByte, 1>;
     instrTable[0xBF] = LD<AddressingMode::DirectByte, AddressingMode::X, 1>;
     instrTable[0xC6] = LD<AddressingMode::A, AddressingMode::DirectLong, 0>;
@@ -275,6 +284,7 @@ void initializeTables() {
 
     precodeTable[0x01] = RRWA<AddressingMode::Y>;
     precodeTable[0x02] = RRWA<AddressingMode::X>;
+    precodeTable[0x42] = MUL<AddressingMode::Y>;
     precodeTable[0x53] = CPL<AddressingMode::Y, 1>;
     precodeTable[0x54] = SRL<AddressingMode::Y, 1>;
     precodeTable[0x5A] = DEC<AddressingMode::Y, 1>;
@@ -784,6 +794,9 @@ void JRcc(const u8 opcode) {
         case Condition::NotCarry:
             condition = ccr.c == 0;
             break;
+        case Condition::LowerSame:
+            condition = (ccr.c != 0) || (ccr.z != 0);
+            break;
         default:
             std::puts("[  CPU  ] Unimplemented condition code");
 
@@ -806,6 +819,25 @@ void LD(const u8 opcode) {
     }
 
     setOperand<dstMode, word>(data);
+}
+
+template<AddressingMode mode>
+void MUL(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<AddressingMode::A, 0>();
+
+    u16 b;
+
+    if constexpr (mode == AddressingMode::X) {
+        b = getOperand<AddressingMode::XL, 0>();
+    } else {
+        b = getOperand<AddressingMode::YL, 0>();
+    }
+
+    ctx.ccr.c = 0;
+
+    setOperand<mode, 1>(a * b);
 }
 
 void NOP(const u8 opcode) {
@@ -933,12 +965,30 @@ void SIM(const u8 opcode) {
 }
 
 template<AddressingMode mode, bool word>
+void SLL(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<mode, word>();
+    const u16 result = (a << 1) & ((1 << (8 + 8 * word)) - 1);
+
+    setBitFlags<word>(result);
+
+    ctx.ccr.c = a >> (7 + 8 * word);
+
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode mode, bool word>
 void SRL(const u8 opcode) {
     (void)opcode;
 
-    const u16 result = getOperand<mode, word>() >> 1;
+    const u16 a = getOperand<mode, word>();
+    const u16 result = a >> 1;
 
     setBitFlags<word>(result);
+
+    ctx.ccr.c = a & 1;
+
     setOperand<mode, word>(result, 1);
 }
 
