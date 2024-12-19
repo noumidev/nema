@@ -55,6 +55,8 @@ enum class Condition {
     True,
     Equal,
     NotEqual,
+    Carry,
+    NotCarry,
 };
 
 struct Context {
@@ -77,6 +79,8 @@ struct Context {
             u8 v : 1;
         };
     } ccr;
+
+    u32 ea;
 
     void setA(const u8 data) {
         a = data;
@@ -115,6 +119,8 @@ InstructionTable instrTable, precodeTable, prefix72Table;
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void ADD(const u8);
 template<AddressingMode mode>
+void AND(const u8);
+template<AddressingMode mode>
 void BCP(const u8);
 void BRES(const u8);
 void BSET(const u8);
@@ -124,8 +130,12 @@ template<AddressingMode mode, bool word>
 void CLR(const u8);
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void CP(const u8);
-template<AddressingMode mode>
-void INCW(const u8);
+template<AddressingMode mode, bool word>
+void CPL(const u8);
+template<AddressingMode mode, bool word>
+void DEC(const u8);
+template<AddressingMode mode, bool word>
+void INC(const u8);
 void INT(const u8);
 void JPF(const u8);
 template<Condition cc>
@@ -134,12 +144,29 @@ template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void LD(const u8);
 template<AddressingMode mode>
 void OR(const u8);
+template<AddressingMode mode, bool word>
+void POP(const u8);
 void PRECODE(const u8);
 void PREFIX72(const u8);
 template<AddressingMode mode, bool word>
 void PUSH(const u8);
 void RET(const u8);
+template<AddressingMode mode>
+void RLWA(const u8);
+template<AddressingMode mode, bool word>
+void RRC(const u8);
+template<AddressingMode mode>
+void RRWA(const u8);
 void SIM(const u8);
+template<AddressingMode mode, bool word>
+void SRL(const u8);
+template<AddressingMode dstMode, AddressingMode srcMode, bool word>
+void SUB(const u8);
+template<AddressingMode mode, bool word>
+void TNZ(const u8);
+template<AddressingMode mode>
+void XOR(const u8);
+
 void UNIMPLEMENTED(const u8);
 void UNIMPLEMENTED_PRECODE(const u8);
 void UNIMPLEMENTED_PREFIX72(const u8);
@@ -149,19 +176,42 @@ void initializeTables() {
         i = UNIMPLEMENTED;
     }
 
+    instrTable[0x01] = RRWA<AddressingMode::X>;
+    instrTable[0x02] = RLWA<AddressingMode::X>;
+    instrTable[0x04] = SRL<AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x06] = RRC<AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x0C] = INC<AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x0F] = CLR<AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x11] = CP<AddressingMode::A, AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x13] = CP<AddressingMode::X, AddressingMode::DirectIndexedShortSP, 1>;
+    instrTable[0x18] = XOR<AddressingMode::DirectIndexedShortSP>;
     instrTable[0x1A] = OR<AddressingMode::DirectIndexedShortSP>;
+    instrTable[0x1B] = ADD<AddressingMode::A, AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x1C] = ADD<AddressingMode::X, AddressingMode::Immediate, 1>;
     instrTable[0x1E] = LD<AddressingMode::X, AddressingMode::DirectIndexedShortSP, 1>;
     instrTable[0x1F] = LD<AddressingMode::DirectIndexedShortSP, AddressingMode::X, 1>;
     instrTable[0x20] = JRcc<Condition::True>;
+    instrTable[0x24] = JRcc<Condition::NotCarry>;
+    instrTable[0x25] = JRcc<Condition::Carry>;
     instrTable[0x26] = JRcc<Condition::NotEqual>;
     instrTable[0x27] = JRcc<Condition::Equal>;
+    instrTable[0x43] = CPL<AddressingMode::A, 0>;
+    instrTable[0x4A] = DEC<AddressingMode::A, 0>;
     instrTable[0x4B] = PUSH<AddressingMode::Immediate, 0>;
+    instrTable[0x4D] = TNZ<AddressingMode::A, 0>;
+    instrTable[0x52] = SUB<AddressingMode::SP, AddressingMode::Immediate, 1>;
+    instrTable[0x54] = SRL<AddressingMode::X, 1>;
     instrTable[0x5B] = ADD<AddressingMode::SP, AddressingMode::Immediate, 1>;
-    instrTable[0x5C] = INCW<AddressingMode::X>;
+    instrTable[0x5C] = INC<AddressingMode::X, 1>;
+    instrTable[0x5F] = CLR<AddressingMode::X, 1>;
+    instrTable[0x6B] = LD<AddressingMode::DirectIndexedShortSP, AddressingMode::A, 0>;
     instrTable[0x72] = PREFIX72;
+    instrTable[0x7B] = LD<AddressingMode::A, AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x81] = RET;
     instrTable[0x82] = INT;
+    instrTable[0x84] = POP<AddressingMode::A, 0>;
+    instrTable[0x85] = POP<AddressingMode::X, 1>;
+    instrTable[0x88] = PUSH<AddressingMode::A, 0>;
     instrTable[0x89] = PUSH<AddressingMode::X, 1>;
     instrTable[0x90] = PRECODE;
     instrTable[0x94] = LD<AddressingMode::SP, AddressingMode::X, 1>;
@@ -171,6 +221,8 @@ void initializeTables() {
     instrTable[0xA1] = CP<AddressingMode::A, AddressingMode::Immediate, 0>;
     instrTable[0xA3] = CP<AddressingMode::X, AddressingMode::Immediate, 1>;
     instrTable[0xA5] = BCP<AddressingMode::Immediate>;
+    instrTable[0xA6] = LD<AddressingMode::A, AddressingMode::Immediate, 0>;
+    instrTable[0xA8] = XOR<AddressingMode::Immediate>;
     instrTable[0xAA] = OR<AddressingMode::Immediate>;
     instrTable[0xAC] = JPF;
     instrTable[0xAE] = LD<AddressingMode::X, AddressingMode::Immediate, 1>;
@@ -182,7 +234,10 @@ void initializeTables() {
     instrTable[0xC7] = LD<AddressingMode::DirectLong, AddressingMode::A, 0>;
     instrTable[0xCD] = CALL<AddressingMode::DirectLong>;
     instrTable[0xCE] = LD<AddressingMode::X, AddressingMode::DirectLong, 1>;
+    instrTable[0xE4] = AND<AddressingMode::DirectIndexedShortX>;
+    instrTable[0xE7] = LD<AddressingMode::DirectIndexedShortX, AddressingMode::A, 0>;
     instrTable[0xEE] = LD<AddressingMode::X, AddressingMode::DirectIndexedShortX, 1>;
+    instrTable[0xF4] = AND<AddressingMode::DirectIndexedX>;
     instrTable[0xF6] = LD<AddressingMode::A, AddressingMode::DirectIndexedX, 0>;
     instrTable[0xF7] = LD<AddressingMode::DirectIndexedX, AddressingMode::A, 0>;
 
@@ -190,7 +245,12 @@ void initializeTables() {
         i = UNIMPLEMENTED_PRECODE;
     }
 
-    precodeTable[0x5C] = INCW<AddressingMode::Y>;
+    precodeTable[0x01] = RRWA<AddressingMode::Y>;
+    precodeTable[0x02] = RRWA<AddressingMode::X>;
+    precodeTable[0x54] = SRL<AddressingMode::Y, 1>;
+    precodeTable[0x5C] = INC<AddressingMode::Y, 1>;
+    precodeTable[0x5F] = CLR<AddressingMode::Y, 1>;
+    precodeTable[0x85] = POP<AddressingMode::Y, 1>;
     precodeTable[0x89] = PUSH<AddressingMode::Y, 1>;
     precodeTable[0x94] = LD<AddressingMode::SP, AddressingMode::Y, 1>;
     precodeTable[0x96] = LD<AddressingMode::Y, AddressingMode::SP, 1>;
@@ -201,7 +261,9 @@ void initializeTables() {
     precodeTable[0xBE] = LD<AddressingMode::Y, AddressingMode::DirectByte, 1>;
     precodeTable[0xBF] = LD<AddressingMode::DirectByte, AddressingMode::Y, 1>;
     precodeTable[0xCE] = LD<AddressingMode::Y, AddressingMode::DirectLong, 1>;
+    precodeTable[0xE4] = AND<AddressingMode::DirectIndexedShortY>;
     precodeTable[0xEE] = LD<AddressingMode::Y, AddressingMode::DirectIndexedShortY, 1>;
+    precodeTable[0xF4] = AND<AddressingMode::DirectIndexedY>;
     precodeTable[0xF6] = LD<AddressingMode::A, AddressingMode::DirectIndexedY, 0>;
     precodeTable[0xF7] = LD<AddressingMode::DirectIndexedY, AddressingMode::A, 0>;
 
@@ -246,11 +308,9 @@ T pop() {
 
     u16 &sp = ctx.sp;
 
-    const T data = read<T>(sp);
-
     sp += sizeof(T);
 
-    return data;
+    return read<T>(sp);
 }
 
 template<typename T>
@@ -259,9 +319,9 @@ void push(const T data) {
 
     u16 &sp = ctx.sp;
 
-    sp -= sizeof(T);
-
     write<T>(sp, data);
+
+    sp -= sizeof(T);
 }
 
 u8 fetchOpcode() {
@@ -329,7 +389,9 @@ u16 getOperand() {
             return (u8)ctx.y;
         default:
             {
-                const u32 ea = getEffectiveAddress<mode>();
+                u32 &ea = ctx.ea;
+
+                ea = getEffectiveAddress<mode>();
 
                 if constexpr (word) {
                     return read<u16>(ea);
@@ -341,7 +403,7 @@ u16 getOperand() {
 }
 
 template<AddressingMode mode, bool word>
-void setOperand(const u16 data) {
+void setOperand(const u16 data, const bool useCachedEa = false) {
     switch (mode) {
         case AddressingMode::Immediate:
             assert(false);
@@ -377,7 +439,11 @@ void setOperand(const u16 data) {
             break;
         default:
             {
-                const u32 ea = getEffectiveAddress<mode>();
+                u32 ea = ctx.ea;
+
+                if (!useCachedEa) {
+                    ea = getEffectiveAddress<mode>();
+                }
 
                 if constexpr (word) {
                     return write<u16>(ea, data);
@@ -453,6 +519,12 @@ bool subOverflow(const u16 a, const u16 b, const u16 r) {
            ((!msbA && msbB) || (!msbA && msbR) || (msbA && msbB && msbR));
 }
 
+template<bool word>
+void setBitFlags(const u16 result) {
+    ctx.ccr.z = result == 0;
+    ctx.ccr.n = result >> (7 + 8 * word);
+}
+
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void ADD(const u8 opcode) {
     (void)opcode;
@@ -483,25 +555,31 @@ void ADD(const u8 opcode) {
 }
 
 template<AddressingMode mode>
+void AND(const u8 opcode) {
+    (void)opcode;
+
+    const u8 result = ctx.a & getOperand<mode, 0>();
+
+    setBitFlags<0>(result);
+
+    ctx.setA(result);
+}
+
+template<AddressingMode mode>
 void BCP(const u8 opcode) {
     (void)opcode;
 
     const u8 result = ctx.a & getOperand<mode, 0>();
 
-    ctx.ccr.z = result == 0;
-    ctx.ccr.n = result >> 7;
+    setBitFlags<0>(result);
 }
 
 void BRES(const u8 opcode) {
-    const u32 ea = getEffectiveAddress<AddressingMode::DirectLong>();
-
-    write<u8>(ea, read<u8>(ea) & ~(1 << ((opcode >> 1) & 7)));
+    setOperand<AddressingMode::DirectLong, 0>(getOperand<AddressingMode::DirectLong, 0>() & ~(1 << ((opcode >> 1) & 7)), 1);
 }
 
 void BSET(const u8 opcode) {
-    const u32 ea = getEffectiveAddress<AddressingMode::DirectLong>();
-
-    write<u8>(ea, read<u8>(ea) | (1 << ((opcode >> 1) & 7)));
+    setOperand<AddressingMode::DirectLong, 0>(getOperand<AddressingMode::DirectLong, 0>() | (1 << ((opcode >> 1) & 7)), 1);
 }
 
 template<AddressingMode mode>
@@ -519,9 +597,7 @@ template<AddressingMode mode, bool word>
 void CLR(const u8 opcode) {
     (void)opcode;
 
-    ctx.ccr.z = 1;
-    ctx.ccr.n = 0;
-
+    setBitFlags<0>(0);
     setOperand<mode, word>(0);
 }
 
@@ -540,17 +616,49 @@ void CP(const u8 opcode) {
     ctx.ccr.v = subOverflow<word>(a, b, result);
 }
 
-template<AddressingMode mode>
-void INCW(const u8 opcode) {
+template<AddressingMode mode, bool word>
+void CPL(const u8 opcode) {
     (void)opcode;
 
-    const u16 result = getOperand<mode, 1>() + 1;
+    const u16 result = (~getOperand<mode, word>()) & ((1 << (8 + 8 * word)) - 1);
+
+    ctx.ccr.c = 1;
+    ctx.ccr.z = result == 0;
+    ctx.ccr.n = result >> (7 + 8 * word);
+
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode mode, bool word>
+void DEC(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<mode, word>();
+    const u16 b = 1;
+
+    const u16 result = (a - b) & ((1 << (8 + 8 * word)) - 1);
 
     ctx.ccr.z = result == 0;
-    ctx.ccr.n = result >> 15;
-    ctx.ccr.v = result == 0x8000; // 7FFF + 1 is the only case that can trigger this
+    ctx.ccr.n = result >> (7 + (8 * word));
+    ctx.ccr.v = subOverflow<word>(a, b, result);
 
-    setOperand<mode, 1>(result);
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode mode, bool word>
+void INC(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<mode, word>();
+    const u16 b = 1;
+
+    const u16 result = (a + b) & ((1 << (8 + 8 * word)) - 1);
+
+    ctx.ccr.z = result == 0;
+    ctx.ccr.n = result >> (7 + (8 * word));
+    ctx.ccr.v = addOverflow<word>(a, b, result);
+
+    setOperand<mode, word>(result, 1);
 }
 
 void INT(const u8 opcode) {
@@ -579,6 +687,12 @@ void JRcc(const u8 opcode) {
         case Condition::NotEqual:
             condition = ccr.z == 0;
             break;
+        case Condition::Carry:
+            condition = ccr.c != 0;
+            break;
+        case Condition::NotCarry:
+            condition = ccr.c == 0;
+            break;
         default:
             std::puts("[  CPU  ] Unimplemented condition code");
 
@@ -603,8 +717,7 @@ void LD(const u8 opcode) {
     const u16 data = getOperand<srcMode, word>();
 
     if constexpr (!isRegister(dstMode) || !isRegister(srcMode)) {
-        ctx.ccr.z = data == 0;
-        ctx.ccr.n = data >> (7 + (8 * word));
+        setBitFlags<word>(data);
     }
 
     setOperand<dstMode, word>(data);
@@ -616,10 +729,24 @@ void OR(const u8 opcode) {
 
     const u8 result = ctx.a | getOperand<mode, 0>();
 
-    ctx.ccr.z = result == 0;
-    ctx.ccr.n = result >> 7;
+    setBitFlags<0>(result);
 
     ctx.setA(result);
+}
+
+template<AddressingMode mode, bool word>
+void POP(const u8 opcode) {
+    (void)opcode;
+
+    u16 data;
+
+    if constexpr (word) {
+        data = pop<u16>();
+    } else {
+        data = pop<u8>();
+    }
+
+    setOperand<mode, word>(data);
 }
 
 template<AddressingMode mode, bool word>
@@ -655,12 +782,119 @@ void RET(const u8 opcode) {
     ctx.setPc((ctx.pc & ~0xFFFF) | pop<u16>());
 }
 
+template<AddressingMode mode>
+void RLWA(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = ctx.a;
+    const u16 x = getOperand<mode, 1>();
+
+    const u16 result = (x << 8) | a;
+
+    setBitFlags<1>(result);
+    setOperand<mode, 1>(result);
+
+    ctx.setA(x >> 8);
+}
+
+template<AddressingMode mode, bool word>
+void RRC(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<mode, word>();
+    const u16 c = ctx.ccr.c;
+
+    const u16 result = (a >> 1) | (c << (7 + 8 * word));
+
+    ctx.ccr.c = a & 1;
+
+    setBitFlags<word>(result);
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode mode>
+void RRWA(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = ctx.a;
+    const u16 x = getOperand<mode, 1>();
+
+    const u16 result = (x >> 8) | (a << 8);
+
+    setBitFlags<1>(result);
+    setOperand<mode, 1>(result);
+
+    ctx.setA(x & 0xFF);
+}
+
 void SIM(const u8 opcode) {
     (void)opcode;
 
     // Disables interrupts
     ctx.ccr.i0 = 1;
     ctx.ccr.i1 = 1;
+}
+
+template<AddressingMode mode, bool word>
+void SRL(const u8 opcode) {
+    (void)opcode;
+
+    const u16 result = getOperand<mode, word>() >> 1;
+
+    setBitFlags<word>(result);
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode dstMode, AddressingMode srcMode, bool word>
+void SUB(const u8 opcode) {
+    (void)opcode;
+
+    const u16 a = getOperand<dstMode, word>();
+
+    u16 b;
+
+    if constexpr (dstMode == AddressingMode::SP) {
+        assert(srcMode == AddressingMode::Immediate);
+
+        b = getOperand<AddressingMode::Immediate, 0>();
+    } else {
+        b = getOperand<srcMode, word>();
+    }
+
+    const u16 result = (a - b) & ((1 << (8 + 8 * word)) - 1);
+
+    if constexpr(dstMode != AddressingMode::SP) {
+        ctx.ccr.c = subCarry<word>(a, b, result);
+        ctx.ccr.z = result == 0;
+        ctx.ccr.n = result >> (7 + 8 * word);
+        ctx.ccr.v = subOverflow<word>(a, b, result);
+
+        if constexpr (word) {
+            ctx.ccr.h = subAuxiliaryCarry<word>(a, b, result);
+        }
+    }
+
+    setOperand<dstMode, word>(result);
+}
+
+template<AddressingMode mode, bool word>
+void TNZ(const u8 opcode) {
+    (void)opcode;
+
+    const u16 data = getOperand<mode, word>();
+
+    setBitFlags<word>(data);
+}
+
+template<AddressingMode mode>
+void XOR(const u8 opcode) {
+    (void)opcode;
+
+    const u8 result = ctx.a ^ getOperand<mode, 0>();
+
+    setBitFlags<0>(result);
+
+    ctx.setA(result);
 }
 
 void UNIMPLEMENTED(const u8 opcode) {
