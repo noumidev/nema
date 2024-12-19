@@ -90,6 +90,19 @@ T read(const u32 addr) {
         return bswap<T>(data);
     }
 
+    switch (addr) {
+        case 0x4808:
+            std::printf("[  MEM  ] OPT3 read%lu\n", 8 * sizeof(T));
+
+            return 2;
+        case 0x514C:
+            std::printf("[  MEM  ] RTC_ISR1 read%lu\n", 8 * sizeof(T));
+
+            return 0x4;
+        default:
+            break;
+    }
+
     std::printf("[  MEM  ] Unmapped read%lu (address = %08X)\n", 8 * sizeof(T), addr);
 
     return 0;
