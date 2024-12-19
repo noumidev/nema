@@ -38,6 +38,7 @@ enum class AddressingMode : int {
     DirectIndexedShortX,
     DirectIndexedShortY,
     DirectIndexedShortSP,
+    IndirectIndexedShortX,
     Immediate,
     SP,
     A,
@@ -113,7 +114,7 @@ struct Context {
     }
 } ctx;
 
-InstructionTable instrTable, precodeTable, prefix72Table;
+InstructionTable instrTable, precodeTable, prefix72Table, prefix92Table;
 
 // Instruction handlers
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
@@ -124,6 +125,8 @@ template<AddressingMode mode>
 void BCP(const u8);
 void BRES(const u8);
 void BSET(const u8);
+template<bool isTrue>
+void BTJcc(const u8);
 template<AddressingMode mode>
 void CALL(const u8);
 template<AddressingMode mode, bool word>
@@ -137,17 +140,21 @@ void DEC(const u8);
 template<AddressingMode mode, bool word>
 void INC(const u8);
 void INT(const u8);
+template<AddressingMode mode>
+void JP(const u8);
 void JPF(const u8);
 template<Condition cc>
 void JRcc(const u8);
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void LD(const u8);
+void NOP(const u8);
 template<AddressingMode mode>
 void OR(const u8);
 template<AddressingMode mode, bool word>
 void POP(const u8);
 void PRECODE(const u8);
 void PREFIX72(const u8);
+void PREFIX92(const u8);
 template<AddressingMode mode, bool word>
 void PUSH(const u8);
 void RET(const u8);
@@ -163,6 +170,8 @@ void SRL(const u8);
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void SUB(const u8);
 template<AddressingMode mode, bool word>
+void SWAP(const u8);
+template<AddressingMode mode, bool word>
 void TNZ(const u8);
 template<AddressingMode mode>
 void XOR(const u8);
@@ -170,6 +179,7 @@ void XOR(const u8);
 void UNIMPLEMENTED(const u8);
 void UNIMPLEMENTED_PRECODE(const u8);
 void UNIMPLEMENTED_PREFIX72(const u8);
+void UNIMPLEMENTED_PREFIX92(const u8);
 
 void initializeTables() {
     for (auto &i : instrTable) {
@@ -181,9 +191,11 @@ void initializeTables() {
     instrTable[0x04] = SRL<AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x06] = RRC<AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x0C] = INC<AddressingMode::DirectIndexedShortSP, 0>;
+    instrTable[0x0D] = TNZ<AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x0F] = CLR<AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x11] = CP<AddressingMode::A, AddressingMode::DirectIndexedShortSP, 0>;
     instrTable[0x13] = CP<AddressingMode::X, AddressingMode::DirectIndexedShortSP, 1>;
+    instrTable[0x16] = LD<AddressingMode::Y, AddressingMode::DirectIndexedShortSP, 1>;
     instrTable[0x18] = XOR<AddressingMode::DirectIndexedShortSP>;
     instrTable[0x1A] = OR<AddressingMode::DirectIndexedShortSP>;
     instrTable[0x1B] = ADD<AddressingMode::A, AddressingMode::DirectIndexedShortSP, 0>;
@@ -195,14 +207,23 @@ void initializeTables() {
     instrTable[0x25] = JRcc<Condition::Carry>;
     instrTable[0x26] = JRcc<Condition::NotEqual>;
     instrTable[0x27] = JRcc<Condition::Equal>;
+    instrTable[0x35] = LD<AddressingMode::DirectLong, AddressingMode::Immediate, 0>;
+    instrTable[0x3A] = DEC<AddressingMode::DirectByte, 0>;
+    instrTable[0x3B] = PUSH<AddressingMode::Immediate, 1>;
     instrTable[0x43] = CPL<AddressingMode::A, 0>;
+    instrTable[0x44] = SRL<AddressingMode::A, 0>;
     instrTable[0x4A] = DEC<AddressingMode::A, 0>;
     instrTable[0x4B] = PUSH<AddressingMode::Immediate, 0>;
     instrTable[0x4D] = TNZ<AddressingMode::A, 0>;
+    instrTable[0x4F] = CLR<AddressingMode::A, 0>;
     instrTable[0x52] = SUB<AddressingMode::SP, AddressingMode::Immediate, 1>;
+    instrTable[0x53] = CPL<AddressingMode::X, 1>;
     instrTable[0x54] = SRL<AddressingMode::X, 1>;
+    instrTable[0x5A] = DEC<AddressingMode::X, 1>;
     instrTable[0x5B] = ADD<AddressingMode::SP, AddressingMode::Immediate, 1>;
     instrTable[0x5C] = INC<AddressingMode::X, 1>;
+    instrTable[0x5D] = TNZ<AddressingMode::X, 1>;
+    instrTable[0x5E] = SWAP<AddressingMode::X, 1>;
     instrTable[0x5F] = CLR<AddressingMode::X, 1>;
     instrTable[0x6B] = LD<AddressingMode::DirectIndexedShortSP, AddressingMode::A, 0>;
     instrTable[0x72] = PREFIX72;
@@ -214,12 +235,16 @@ void initializeTables() {
     instrTable[0x88] = PUSH<AddressingMode::A, 0>;
     instrTable[0x89] = PUSH<AddressingMode::X, 1>;
     instrTable[0x90] = PRECODE;
+    instrTable[0x92] = PREFIX92;
     instrTable[0x94] = LD<AddressingMode::SP, AddressingMode::X, 1>;
     instrTable[0x96] = LD<AddressingMode::X, AddressingMode::SP, 1>;
     instrTable[0x97] = LD<AddressingMode::XL, AddressingMode::A, 0>;
     instrTable[0x9B] = SIM;
+    instrTable[0x9D] = NOP;
+    instrTable[0x9F] = LD<AddressingMode::A, AddressingMode::XL, 0>;
     instrTable[0xA1] = CP<AddressingMode::A, AddressingMode::Immediate, 0>;
     instrTable[0xA3] = CP<AddressingMode::X, AddressingMode::Immediate, 1>;
+    instrTable[0xA4] = AND<AddressingMode::Immediate>;
     instrTable[0xA5] = BCP<AddressingMode::Immediate>;
     instrTable[0xA6] = LD<AddressingMode::A, AddressingMode::Immediate, 0>;
     instrTable[0xA8] = XOR<AddressingMode::Immediate>;
@@ -228,13 +253,16 @@ void initializeTables() {
     instrTable[0xAE] = LD<AddressingMode::X, AddressingMode::Immediate, 1>;
     instrTable[0xB3] = CP<AddressingMode::X, AddressingMode::DirectByte, 1>;
     instrTable[0xB6] = LD<AddressingMode::A, AddressingMode::DirectByte, 0>;
+    instrTable[0xB7] = LD<AddressingMode::DirectByte, AddressingMode::A, 0>;
     instrTable[0xBE] = LD<AddressingMode::X, AddressingMode::DirectByte, 1>;
     instrTable[0xBF] = LD<AddressingMode::DirectByte, AddressingMode::X, 1>;
     instrTable[0xC6] = LD<AddressingMode::A, AddressingMode::DirectLong, 0>;
     instrTable[0xC7] = LD<AddressingMode::DirectLong, AddressingMode::A, 0>;
+    instrTable[0xCC] = JP<AddressingMode::DirectLong>;
     instrTable[0xCD] = CALL<AddressingMode::DirectLong>;
     instrTable[0xCE] = LD<AddressingMode::X, AddressingMode::DirectLong, 1>;
     instrTable[0xE4] = AND<AddressingMode::DirectIndexedShortX>;
+    instrTable[0xE6] = LD<AddressingMode::A, AddressingMode::DirectIndexedShortX, 0>;
     instrTable[0xE7] = LD<AddressingMode::DirectIndexedShortX, AddressingMode::A, 0>;
     instrTable[0xEE] = LD<AddressingMode::X, AddressingMode::DirectIndexedShortX, 1>;
     instrTable[0xF4] = AND<AddressingMode::DirectIndexedX>;
@@ -247,14 +275,19 @@ void initializeTables() {
 
     precodeTable[0x01] = RRWA<AddressingMode::Y>;
     precodeTable[0x02] = RRWA<AddressingMode::X>;
+    precodeTable[0x53] = CPL<AddressingMode::Y, 1>;
     precodeTable[0x54] = SRL<AddressingMode::Y, 1>;
+    precodeTable[0x5A] = DEC<AddressingMode::Y, 1>;
     precodeTable[0x5C] = INC<AddressingMode::Y, 1>;
+    precodeTable[0x5D] = TNZ<AddressingMode::Y, 1>;
+    precodeTable[0x5E] = SWAP<AddressingMode::Y, 1>;
     precodeTable[0x5F] = CLR<AddressingMode::Y, 1>;
     precodeTable[0x85] = POP<AddressingMode::Y, 1>;
     precodeTable[0x89] = PUSH<AddressingMode::Y, 1>;
     precodeTable[0x94] = LD<AddressingMode::SP, AddressingMode::Y, 1>;
     precodeTable[0x96] = LD<AddressingMode::Y, AddressingMode::SP, 1>;
     precodeTable[0x97] = LD<AddressingMode::YL, AddressingMode::A, 0>;
+    precodeTable[0x9F] = LD<AddressingMode::A, AddressingMode::YL, 0>;
     precodeTable[0xA3] = CP<AddressingMode::Y, AddressingMode::Immediate, 1>;
     precodeTable[0xAE] = LD<AddressingMode::Y, AddressingMode::Immediate, 1>;
     precodeTable[0xB3] = CP<AddressingMode::Y, AddressingMode::DirectByte, 1>;
@@ -272,11 +305,19 @@ void initializeTables() {
     }
 
     for (int i = 0; i < 0x10; i += 2) {
+        prefix72Table[0x00 | i] = BTJcc<1>;
+        prefix72Table[0x01 | i] = BTJcc<0>;
         prefix72Table[0x10 | i] = BSET;
         prefix72Table[0x11 | i] = BRES;
     }
 
     prefix72Table[0x5F] = CLR<AddressingMode::DirectLong, 0>;
+
+    for (auto &i : prefix92Table) {
+        i = UNIMPLEMENTED_PREFIX92;
+    }
+
+    prefix92Table[0x6F] = CLR<AddressingMode::IndirectIndexedShortX, 0>;
 }
 
 void initialize() {
@@ -308,9 +349,19 @@ T pop() {
 
     u16 &sp = ctx.sp;
 
-    sp += sizeof(T);
+    sp += sizeof(u8);
 
-    return read<T>(sp);
+    u16 data = read<u8>(sp);
+
+    if constexpr (std::is_same_v<T, u16>) {
+        data <<= 8;
+
+        sp += sizeof(u8);
+
+        data |= read<u8>(sp);
+    }
+
+    return data;
 }
 
 template<typename T>
@@ -319,9 +370,15 @@ void push(const T data) {
 
     u16 &sp = ctx.sp;
 
-    write<T>(sp, data);
+    write<u8>(sp, (u8)data);
 
-    sp -= sizeof(T);
+    sp -= sizeof(u8);
+
+    if constexpr (std::is_same_v<T, u16>) {
+        write<u8>(sp, (u8)(data >> 8));
+
+        sp -= sizeof(u8);
+    }
 }
 
 u8 fetchOpcode() {
@@ -349,6 +406,8 @@ u32 getEffectiveAddress() {
             return ctx.y + fetch<u8>();
         case AddressingMode::DirectIndexedShortSP:
             return ctx.sp + fetch<u8>();
+        case AddressingMode::IndirectIndexedShortX:
+            return ctx.x + read<u16>(fetch<u8>());
         default:
             assert(false);
     }
@@ -582,6 +641,23 @@ void BSET(const u8 opcode) {
     setOperand<AddressingMode::DirectLong, 0>(getOperand<AddressingMode::DirectLong, 0>() | (1 << ((opcode >> 1) & 7)), 1);
 }
 
+template<bool isTrue>
+void BTJcc(const u8 opcode) {
+    (void)opcode;
+
+    bool condition = (getOperand<AddressingMode::DirectLong, 0>() & (1 << ((opcode >> 1) & 7))) == 0;
+
+    if constexpr (isTrue) {
+        condition = !condition;
+    }
+
+    const u32 offset = (u32)(i8)fetch<u8>();
+
+    if (condition) {
+        ctx.setPc(ctx.pc + offset);
+    }
+}
+
 template<AddressingMode mode>
 void CALL(const u8 opcode) {
     (void)opcode;
@@ -667,6 +743,21 @@ void INT(const u8 opcode) {
     ctx.setPc(getEffectiveAddress<AddressingMode::DirectExtended>());
 };
 
+template<AddressingMode mode>
+void JP(const u8 opcode) {
+    (void)opcode;
+
+    const u32 addr = getEffectiveAddress<mode>();
+
+    ctx.setPc((ctx.pc & ~0xFFFF) | addr);
+}
+
+void JPF(const u8 opcode) {
+    (void)opcode;
+
+    ctx.setPc(getEffectiveAddress<AddressingMode::DirectExtended>());
+};
+
 template<Condition cc>
 void JRcc(const u8 opcode) {
     (void)opcode;
@@ -704,12 +795,6 @@ void JRcc(const u8 opcode) {
     }
 }
 
-void JPF(const u8 opcode) {
-    (void)opcode;
-
-    ctx.setPc(getEffectiveAddress<AddressingMode::DirectExtended>());
-};
-
 template<AddressingMode dstMode, AddressingMode srcMode, bool word>
 void LD(const u8 opcode) {
     (void)opcode;
@@ -721,6 +806,10 @@ void LD(const u8 opcode) {
     }
 
     setOperand<dstMode, word>(data);
+}
+
+void NOP(const u8 opcode) {
+    (void)opcode;
 }
 
 template<AddressingMode mode>
@@ -774,6 +863,14 @@ void PREFIX72(const u8 opcode) {
     const u8 nextOpcode = fetchOpcode();
 
     return prefix72Table[nextOpcode](nextOpcode);
+}
+
+void PREFIX92(const u8 opcode) {
+    (void)opcode;
+
+    const u8 nextOpcode = fetchOpcode();
+
+    return prefix92Table[nextOpcode](nextOpcode);
 }
 
 void RET(const u8 opcode) {
@@ -878,6 +975,19 @@ void SUB(const u8 opcode) {
 }
 
 template<AddressingMode mode, bool word>
+void SWAP(const u8 opcode) {
+    (void)opcode;
+
+    const int amt = 4 + 4 * word;
+
+    const u16 a = getOperand<mode, word>();
+    const u16 result = (a >> amt) | (a << amt);
+
+    setBitFlags<word>(result);
+    setOperand<mode, word>(result, 1);
+}
+
+template<AddressingMode mode, bool word>
 void TNZ(const u8 opcode) {
     (void)opcode;
 
@@ -911,6 +1021,12 @@ void UNIMPLEMENTED_PRECODE(const u8 opcode) {
 
 void UNIMPLEMENTED_PREFIX72(const u8 opcode) {
     std::printf("[  CPU  ] Unimplemented PREFIX 72 opcode %02X (PC = %06X)\n", opcode, ctx.cpc);
+
+    exit(1);
+}
+
+void UNIMPLEMENTED_PREFIX92(const u8 opcode) {
+    std::printf("[  CPU  ] Unimplemented PREFIX 92 opcode %02X (PC = %06X)\n", opcode, ctx.cpc);
 
     exit(1);
 }
