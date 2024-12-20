@@ -215,7 +215,7 @@ void initializeTables() {
     instrTable[0x27] = JRcc<Condition::Equal>;
     instrTable[0x35] = LD<AddressingMode::DirectLong, AddressingMode::Immediate, 0>;
     instrTable[0x3A] = DEC<AddressingMode::DirectByte, 0>;
-    instrTable[0x3B] = PUSH<AddressingMode::Immediate, 1>;
+    instrTable[0x3B] = PUSH<AddressingMode::DirectLong, 0>;
     instrTable[0x42] = MUL<AddressingMode::X>;
     instrTable[0x43] = CPL<AddressingMode::A, 0>;
     instrTable[0x44] = SRL<AddressingMode::A, 0>;
