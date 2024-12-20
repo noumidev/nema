@@ -22,6 +22,7 @@ set(SOURCES
     src/common/bswap.cpp
     src/common/file.cpp
     src/hw/cpu.cpp
+    src/hw/dma.cpp
     src/sys/emulator.cpp
     src/sys/memory.cpp
 )
@@ -32,6 +33,7 @@ set(HEADERS
     include/common/file.hpp
     include/common/types.hpp
     include/hw/cpu.hpp
+    include/hw/dma.hpp
     include/sys/config.hpp
     include/sys/emulator.hpp
     include/sys/memory.hpp

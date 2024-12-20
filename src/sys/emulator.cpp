@@ -8,6 +8,7 @@
 #include <cstdio>
 
 #include "hw/cpu.hpp"
+#include "hw/dma.hpp"
 
 #include "sys/memory.hpp"
 
@@ -20,10 +21,12 @@ void initialize(const Config &config) {
     memory::initialize(config);
 
     hw::cpu::initialize();
+    hw::dma::initialize();
 }
 
 void shutdown() {
     hw::cpu::shutdown();
+    hw::dma::shutdown();
 
     memory::shutdown();
 }

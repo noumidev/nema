@@ -14,6 +14,8 @@
 #include "common/bswap.hpp"
 #include "common/file.hpp"
 
+#include "hw/dma.hpp"
+
 using namespace common;
 
 namespace sys::memory {
@@ -90,6 +92,10 @@ T read(const u32 addr) {
         return bswap<T>(data);
     }
 
+    if ((addr >= MemoryBase::DMA) && (addr < MemoryBase::SYSCFG)) {
+        return hw::dma::read<T>(addr);
+    }
+
     switch (addr) {
         case 0x4808:
             std::printf("[  MEM  ] OPT3 read%lu\n", 8 * sizeof(T));
@@ -119,12 +125,20 @@ void write(const u32 addr, const T data) {
 
     const u32 page = addr >> SHIFT_PAGE;
 
+    if (data == 0x31C3) {
+        exit(1);
+    }
+
     if (pageTable.writeTable[page] != NULL) {
         const T swappedData = bswap<T>(data);
 
         std::memcpy(&pageTable.readTable[page][addr & MASK_PAGE], &swappedData, sizeof(T));
 
         return;
+    }
+
+    if ((addr >= MemoryBase::DMA) && (addr < MemoryBase::SYSCFG)) {
+        return hw::dma::write<T>(addr, data);
     }
 
     std::printf("[  MEM  ] Unmapped write%lu (address = %08X, data = %02X)\n", 8 * sizeof(T), addr, data);

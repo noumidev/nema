@@ -15,6 +15,8 @@ namespace MemoryBase {
     enum : common::u32 {
         RAM = 0,
         EEPROM = 0x1000,
+        DMA = 0x5070,
+        SYSCFG = 0x509D,
         FLASH = 0x8000,
     };
 }
